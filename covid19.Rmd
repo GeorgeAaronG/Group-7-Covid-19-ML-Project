@@ -1,0 +1,35 @@
+---
+title: "Group 7: Covid-19 Forecast and Analysis"
+author: "George Garcia, Torreon Green, Alexander Nguyen, Edgar Sosa Leal"
+date: "4/18/2020"
+output: powerpoint_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(skimr)
+```
+
+## Presentation outline
+
+- The problem
+- Knowledge and understanding of the problem
+- Significance of the problem
+- Understanding / analyzing the results
+
+## The data
+
+```{r cars, echo = TRUE}
+covidData <- read.csv("C:/Users/george/Documents/R Assignments/INFS 6359 Data Mining for Business Analytics/Group-7-Covid-19-ML-Project/covid-statistics-by-us-states-daily-updates.csv", header = TRUE)
+skim(covidData)
+```
+
+## Time series
+
+```{r}
+tail(covidData)
+```
+
