@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ```{r}
 library(skimr)
+library(tidyverse)
 ```
 
 ## Presentation outline
@@ -31,5 +32,13 @@ skim(covidData)
 
 ```{r}
 tail(covidData)
+```
+
+## Texas trends
+
+```{r}
+TXdata <- covidData %>%
+  filter(state == "TX")
+head(TXdata)
 ```
 
