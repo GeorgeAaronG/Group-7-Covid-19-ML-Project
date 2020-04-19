@@ -42,3 +42,19 @@ TXdata <- covidData %>%
 head(TXdata)
 ```
 
+## Compute the number of positive cases daily
+
+```{r}
+covid.diff <-covidData %>%
+    group_by(state) %>%
+    mutate(Diff = positive - lead(positive))
+```
+
+## Resort data according to the date
+
+```{r}
+covidData.sort2 <- covid.diff %>%
+   arrange(date)
+```
+
+
