@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = FALSE)
 library(skimr)
 library(tidyverse)
 library(forecast)
+library(BatchGetSymbols)
+options(scipen = 999, digits = 3)
 ```
 
 ## The Data
@@ -53,13 +55,13 @@ coronaCases <- corona[, c(5, 6)]
 coronaTotal <- coronaCases %>%
   mutate(total = cumsum(cases))
 
-coronaTotal
+coronaTotal[82:88, ] # Validation set
 
 ```
 
 ## Time Series Exponential Model
 
-```{r}
+```{r, echo=TRUE}
 coronaTrain <- coronaTotal[1:81, ]
 coronaValid <- coronaTotal[82:88, ]
 
@@ -73,28 +75,142 @@ coronaValidTS <- ts(coronaValid$total,
                    end = 88,
                    freq = 1)
 
-coronaAR <- tslm(coronaTrainTS ~ trend, lambda = 0)
+modelLM <- tslm(coronaTrainTS ~ trend, lambda = 0) # Lambda = 0 for exponential fit.
 
-summary(coronaAR)
+summary(modelLM)
+```
+
+## Random Walk Test
+
+- AR(1) model slope coefficient is within 5 standard errors of 1
+- Fails random walk test -> stick to naive LM
+
+```{r, echo=TRUE}
+modelARIMA <- Arima(modelLM$residuals, order = c(1,0,0))
+predictARIMA <- forecast(modelARIMA, h = 7)
+
+summary(modelARIMA)
 ```
 
 ## Forecast: Post- April 12, 2020
 
 ```{r}
-coronaPredict <- forecast(coronaAR, h = 7, level = 0)
+coronaPredict <- forecast(modelLM, h = 7, level = 0)
 
-# plot(coronaPredict, xlab = "# of Days",
-#      ylab = "U.S. Total cases",
-#      ylim = c(1, 1000000),
-#      bty = "l")
-# lines(coronaPredict$fitted, lwd = 2, col = "blue")
-# lines(coronaValidTS, lwd = 2, col = "red", lty = 3)
-
-plot(coronaTrainTS, xlab = "# of Days", 
+plot(coronaTrainTS, 
+     xlab = "# of Days", 
      ylab = "U.S. Total Confirmed Cases",
-     ylim = c(1, 1000000), 
-     bty = "l")
-lines(coronaPredict$fitted, lwd = 2, col = "blue")
-lines(coronaValidTS, lwd = 2, col = "black", lty = 3)
+     ylim = c(1, 800000),
+     xlim = c(1, 100),
+     col = "blue",
+     lty = 1)
+lines(coronaPredict$fitted, 
+      lty = 2,
+      col = "red")
+lines(coronaValidTS, 
+      lty = 1, 
+      col = "blue")
+lines(c(82:88), coronaPredict$mean, 
+      col = "red",
+      lty = 2)
+legend(1, 800000, 
+       legend = c("Actual", "Predicted"), 
+       col = c("blue", "red"), 
+       lty = 1:2)
+
+```
+
+## Quadratic Model
+
+```{r}
+modelQuad <- tslm(coronaTrainTS ~ trend + I(trend^2)) # Quad fit
+
+summary(modelQuad)
+```
+
+```{r, include=FALSE}
+quadARIMA <- Arima(modelQuad$residuals, order = c(1,0,0), method = "ML")
+predictQuad <- forecast(quadARIMA, h = 7)
+
+summary(predictQuad)
+```
+
+## Quadratic Model
+
+```{r, echo=FALSE}
+plot(coronaTrainTS, 
+     xlab = "# of Days", 
+     ylab = "U.S. Total Confirmed Cases",
+     ylim = c(1, 1000000),
+     xlim = c(1, 100),
+     col = "blue",
+     lty = 1)
+lines(predictQuad$fitted, 
+      lty = 2,
+      col = "red")
+lines(coronaValidTS, 
+      lty = 1, 
+      col = "blue")
+lines(predictQuad$mean, 
+      lty = 2,
+      col = "red")
+legend(1, 800000, 
+       legend = c("Actual", "Predicted"), 
+       col = c("blue", "red"), 
+       lty = 1:2)
+```
+
+## Part II: Impact on S&P 500
+
+```{r, echo=TRUE}
+companies <- 'SPY'
+begin <- Sys.Date() - 200
+end <- Sys.Date()
+
+stockData <- BatchGetSymbols(tickers = companies,
+                             first.date = begin,
+                             last.date = end,
+                             do.cache = FALSE)
+
+SPY <- stockData$df.tickers %>%
+  filter(ticker == "SPY")
+head(SPY)
+
+SPYTrain <- SPY[1:97, ]
+SPYValid <- SPY[98:136, ]
+```
+
+## Quadratic Model
+
+```{r}
+# Time series til Feb 19, 2020
+SPYTS <- ts(SPYTrain$price.close,
+            start = c(2019, 10),
+            end = c(2020, 02),
+            freq = 97)
+
+SPYValidTS <- ts(SPYValid$price.close,
+                   start = c(2020, 02),
+                   end = c(2020, 04),
+                   freq = 41)
+
+SPYQuad <- tslm(SPYTS ~ trend + I(trend^2))
+summary(SPYQuad)
+```
+
+## Forecast
+
+```{r}
+# Forecast after Feb 20, 2020
+SPYPredict <- forecast(SPYQuad, level = 95)
+
+plot(SPYPredict, xlab = "Time",
+     ylab = "SPY Close Price",
+     #ylim = c(200, 400),
+     bty = "l",
+     xaxt = "n",
+     flty = 2)
+lines(SPYPredict$fitted, lwd = 2, col = "blue")
+lines(SPYValidTS, lwd = 2, col = "red", lty = 3)
 ```
 
