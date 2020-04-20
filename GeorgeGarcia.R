@@ -8,7 +8,7 @@ library(tidyverse)
 library(forecast)
 options(scipen = 999, digits = 3)
 
-companies <- c('AAPL', 'AMZN', 'MSFT', 'JPM', 'JNJ')
+companies <- c('AAPL', 'AMZN', 'MMM', 'JPM', 'JNJ')
 begin <- Sys.Date() - 200
 end <- Sys.Date()
 
@@ -38,12 +38,8 @@ appleValidTS <- ts(appleValid$price.close,
 appleAR <- tslm(appleTS ~ trend + I(trend^2))
 summary(appleAR)
 
-plot(appleTS, xlab = "Time", 
-     ylab = "APPL Close Price",
-     bty = "l")
-
 # Forecast after Feb 20, 2020
-applePredict <- forecast(appleAR, h = 41, level = 95)
+applePredict <- forecast(appleAR, level = 95)
 
 plot(applePredict, xlab = "Time",
      ylab = "AAPL Close Price",
@@ -53,3 +49,4 @@ plot(applePredict, xlab = "Time",
      flty = 2)
 lines(applePredict$fitted, lwd = 2, col = "blue")
 lines(appleValidTS, lwd = 2, col = "red", lty = 3)
+

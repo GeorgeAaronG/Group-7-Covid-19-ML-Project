@@ -12,49 +12,89 @@ knitr::opts_chunk$set(echo = FALSE)
 ```{r}
 library(skimr)
 library(tidyverse)
+library(forecast)
 ```
 
-## Presentation outline
+## The Data
 
-- The problem
-- Knowledge and understanding of the problem
-- Significance of the problem
-- Understanding / analyzing the results
-
-## The data
-
-```{r cars, echo = TRUE}
+```{r}
+load(file = "coronavirus.rda")
 covidData <- read.csv("C:/Users/george/Documents/R Assignments/INFS 6359 Data Mining for Business Analytics/Group-7-Covid-19-ML-Project/covid-statistics-by-us-states-daily-updates.csv", header = TRUE)
-skim(covidData)
-```
-
-## Time series
-
-```{r}
-tail(covidData)
-```
-
-## Texas trends
-
-```{r}
-TXdata <- covidData %>%
-  filter(state == "TX")
-head(TXdata)
+head(covidData)
 ```
 
 ## Compute the number of positive cases daily
 
-```{r}
+```{r, echo=TRUE}
 covid.diff <-covidData %>%
     group_by(state) %>%
     mutate(Diff = positive - lead(positive))
-```
 
-## Resort data according to the date
-
-```{r}
 covidData.sort2 <- covid.diff %>%
    arrange(date)
+
+covid.sort3 <- covidData.sort2 %>%
+  group_by(date) %>%
+  summarize(totals = sum(Diff)) 
+
+covid.sort3
 ```
 
+## U.S. Confirmed Cases
+
+```{r, echo=TRUE}
+
+corona <- coronavirus %>%
+  filter(Country.Region == "US") %>%
+  filter(type == "confirmed")
+
+coronaCases <- corona[, c(5, 6)]
+
+coronaTotal <- coronaCases %>%
+  mutate(total = cumsum(cases))
+
+coronaTotal
+
+```
+
+## Time Series Exponential Model
+
+```{r}
+coronaTrain <- coronaTotal[1:81, ]
+coronaValid <- coronaTotal[82:88, ]
+
+coronaTrainTS <- ts(coronaTrain$total,
+            start = 1,
+            end = 81,
+            freq = 1)
+
+coronaValidTS <- ts(coronaValid$total,
+                   start = 82,
+                   end = 88,
+                   freq = 1)
+
+coronaAR <- tslm(coronaTrainTS ~ trend, lambda = 0)
+
+summary(coronaAR)
+```
+
+## Forecast: Post- April 12, 2020
+
+```{r}
+coronaPredict <- forecast(coronaAR, h = 7, level = 0)
+
+# plot(coronaPredict, xlab = "# of Days",
+#      ylab = "U.S. Total cases",
+#      ylim = c(1, 1000000),
+#      bty = "l")
+# lines(coronaPredict$fitted, lwd = 2, col = "blue")
+# lines(coronaValidTS, lwd = 2, col = "red", lty = 3)
+
+plot(coronaTrainTS, xlab = "# of Days", 
+     ylab = "U.S. Total Confirmed Cases",
+     ylim = c(1, 1000000), 
+     bty = "l")
+lines(coronaPredict$fitted, lwd = 2, col = "blue")
+lines(coronaValidTS, lwd = 2, col = "black", lty = 3)
+```
 
