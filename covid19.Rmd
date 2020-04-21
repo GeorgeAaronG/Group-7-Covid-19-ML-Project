@@ -9,7 +9,7 @@ output: powerpoint_presentation
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-```{r}
+```{r, include=FALSE}
 library(skimr)
 library(tidyverse)
 library(forecast)
@@ -231,23 +231,23 @@ SPY <- stockData$df.tickers %>%
   filter(ticker == "SPY")
 head(SPY)
 
-SPYTrain <- SPY[1:97, ]
-SPYValid <- SPY[98:136, ]
+preSPY <- SPY[1:94, ] # 90 bull market days leading to market high: Feb 19, 2020
+postSPY <- SPY[95:117, ] # 22 bear market days following
 ```
 
 # Quadratic Model
 
 ```{r, echo=TRUE}
 # Time series til Feb 19, 2020
-SPYTS <- ts(SPYTrain$price.close,
-            start = c(2019, 10),
-            end = c(2020, 02),
-            freq = 97)
+SPYTS <- ts(preSPY$price.close,
+            start = 1,
+            end = 94,
+            freq = 1)
 
-SPYValidTS <- ts(SPYValid$price.close,
-                   start = c(2020, 02),
-                   end = c(2020, 04),
-                   freq = 41)
+postSPYTS <- ts(postSPY$price.close,
+                   start = 95,
+                   end = 117,
+                freq = 1)
 
 SPYQuad <- tslm(SPYTS ~ trend + I(trend^2))
 summary(SPYQuad)
@@ -256,21 +256,22 @@ summary(SPYQuad)
 # Quadratic Model: Forecast
 
 ```{r}
-# Forecast after Feb 20, 2020
-SPYPredict <- forecast(SPYQuad, level = 95)
+# Forecast after Feb 20, 2020: From market high to market low
+SPYPredict <- forecast(SPYQuad, h = 23, level = 95)
 
-plot(SPYPredict, 
-     xlab = "Time",
+plot(SPYPredict,
+     xlab = "October 4, 2019 - March 23, 2020",
      ylab = "SPY Close Price",
+     ylim = c(200, 350),
      bty = "l",
      xaxt = "n",
      flty = 2)
 lines(SPYPredict$fitted, 
       lwd = 2, 
       col = "blue")
-lines(SPYValidTS, 
+lines(postSPYTS, 
       lwd = 2, 
       col = "red", 
-      lty = 3)
+      lty = 1)
 ```
 
