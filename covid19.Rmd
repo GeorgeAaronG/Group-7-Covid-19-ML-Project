@@ -14,10 +14,11 @@ library(skimr)
 library(tidyverse)
 library(forecast)
 library(BatchGetSymbols)
+library(quantmod)
 options(scipen = 999, digits = 3)
 ```
 
-## The Data
+# The Data
 
 ```{r}
 load(file = "coronavirus.rda")
@@ -25,9 +26,7 @@ covidData <- read.csv("C:/Users/george/Documents/R Assignments/INFS 6359 Data Mi
 head(covidData)
 ```
 
-## Compute the number of positive cases daily
-
-```{r, echo=TRUE}
+```{r, include=FALSE}
 covid.diff <-covidData %>%
     group_by(state) %>%
     mutate(Diff = positive - lead(positive))
@@ -42,7 +41,7 @@ covid.sort3 <- covidData.sort2 %>%
 covid.sort3
 ```
 
-## U.S. Confirmed Cases
+# U.S. Confirmed Cases
 
 ```{r, echo=TRUE}
 
@@ -59,7 +58,7 @@ coronaTotal[82:88, ] # Validation set
 
 ```
 
-## Time Series Exponential Model
+# Time Series
 
 ```{r, echo=TRUE}
 coronaTrain <- coronaTotal[1:81, ]
@@ -74,28 +73,106 @@ coronaValidTS <- ts(coronaValid$total,
                    start = 82,
                    end = 88,
                    freq = 1)
+```
 
-modelLM <- tslm(coronaTrainTS ~ trend, lambda = 0) # Lambda = 0 for exponential fit.
+# Linear Model
 
+```{r}
+modelLM <- tslm(coronaTrainTS ~ trend) # Linear fit
 summary(modelLM)
 ```
 
-## Random Walk Test
-
-- AR(1) model slope coefficient is within 5 standard errors of 1
-- Fails random walk test -> stick to naive LM
-
-```{r, echo=TRUE}
-modelARIMA <- Arima(modelLM$residuals, order = c(1,0,0))
-predictARIMA <- forecast(modelARIMA, h = 7)
-
-summary(modelARIMA)
-```
-
-## Forecast: Post- April 12, 2020
+# Linear Model: Forecast
 
 ```{r}
-coronaPredict <- forecast(modelLM, h = 7, level = 0)
+predictLM <- forecast(modelLM, h = 7)
+
+plot(coronaTrainTS, 
+     xlab = "# of Days", 
+     ylab = "U.S. Total Confirmed Cases",
+     ylim = c(1, 1000000),
+     xlim = c(1, 100),
+     col = "blue",
+     lty = 1)
+lines(predictLM$fitted, 
+      lty = 2,
+      col = "red")
+lines(coronaValidTS, 
+      lty = 1, 
+      col = "blue")
+lines(predictLM$mean, 
+      lty = 2,
+      col = "red")
+legend(1, 800000, 
+       legend = c("Actual", "Predicted"), 
+       col = c("blue", "red"), 
+       lty = 1:2)
+```
+
+# Linear Model: Accuracy
+
+```{r}
+accuracy(predictLM$mean, coronaValidTS)
+```
+
+# Quadratic Model
+
+```{r}
+modelQuad <- tslm(coronaTrainTS ~ trend + I(trend^2)) # Quad fit
+
+summary(modelQuad)
+```
+
+# Quadratic Model: Forecast
+
+```{r}
+predictQuad <- forecast(modelQuad, level = 95, h = 7)
+
+plot(coronaTrainTS, 
+     xlab = "# of Days", 
+     ylab = "U.S. Total Confirmed Cases",
+     ylim = c(1, 1000000),
+     xlim = c(1, 100),
+     col = "blue",
+     lty = 1)
+lines(predictQuad$fitted, 
+      lty = 2,
+      col = "red")
+lines(coronaValidTS, 
+      lty = 1, 
+      col = "blue")
+lines(predictQuad$mean, 
+      lty = 2,
+      col = "red")
+legend(1, 800000, 
+       legend = c("Actual", "Predicted"), 
+       col = c("blue", "red"), 
+       lty = 1:2)
+```
+
+# Quadratic Model: Accuracy
+
+```{r}
+accuracy(predictQuad$mean, coronaValidTS)
+```
+
+```{r, include=FALSE}
+quadARIMA <- Arima(modelQuad$residuals, order = c(1,0,0), method = "ML")
+summary(quadARIMA)
+```
+
+# Exponential Model
+
+```{r}
+modelExp <- tslm(coronaTrainTS ~ trend, lambda = 0) # Lambda = 0 for exponential fit.
+
+summary(modelExp)
+```
+
+# Exponential Model: Forecast
+
+```{r}
+coronaPredict <- forecast(modelExp, h = 7, level = 95)
 
 plot(coronaTrainTS, 
      xlab = "# of Days", 
@@ -120,47 +197,25 @@ legend(1, 800000,
 
 ```
 
-## Quadratic Model
+# Exponential Model: Accuracy
 
 ```{r}
-modelQuad <- tslm(coronaTrainTS ~ trend + I(trend^2)) # Quad fit
-
-summary(modelQuad)
+accuracy(coronaPredict$mean, coronaValidTS)
 ```
 
-```{r, include=FALSE}
-quadARIMA <- Arima(modelQuad$residuals, order = c(1,0,0), method = "ML")
-predictQuad <- forecast(quadARIMA, h = 7)
+# AR(1) Model: Random Walk Test
 
-summary(predictQuad)
+- AR(1) model slope coefficient is within 1-2 standard errors of 1
+- Fails random walk test -> stick to naive LM
+
+```{r}
+modelARIMA <- Arima(modelExp$residuals, order = c(1,0,0))
+summary(modelARIMA)
 ```
 
-## Quadratic Model
 
-```{r, echo=FALSE}
-plot(coronaTrainTS, 
-     xlab = "# of Days", 
-     ylab = "U.S. Total Confirmed Cases",
-     ylim = c(1, 1000000),
-     xlim = c(1, 100),
-     col = "blue",
-     lty = 1)
-lines(predictQuad$fitted, 
-      lty = 2,
-      col = "red")
-lines(coronaValidTS, 
-      lty = 1, 
-      col = "blue")
-lines(predictQuad$mean, 
-      lty = 2,
-      col = "red")
-legend(1, 800000, 
-       legend = c("Actual", "Predicted"), 
-       col = c("blue", "red"), 
-       lty = 1:2)
-```
 
-## Part II: Impact on S&P 500
+# Part II: Impact on S&P 500
 
 ```{r, echo=TRUE}
 companies <- 'SPY'
@@ -180,9 +235,9 @@ SPYTrain <- SPY[1:97, ]
 SPYValid <- SPY[98:136, ]
 ```
 
-## Quadratic Model
+# Quadratic Model
 
-```{r}
+```{r, echo=TRUE}
 # Time series til Feb 19, 2020
 SPYTS <- ts(SPYTrain$price.close,
             start = c(2019, 10),
@@ -198,19 +253,24 @@ SPYQuad <- tslm(SPYTS ~ trend + I(trend^2))
 summary(SPYQuad)
 ```
 
-## Forecast
+# Quadratic Model: Forecast
 
 ```{r}
 # Forecast after Feb 20, 2020
 SPYPredict <- forecast(SPYQuad, level = 95)
 
-plot(SPYPredict, xlab = "Time",
+plot(SPYPredict, 
+     xlab = "Time",
      ylab = "SPY Close Price",
-     #ylim = c(200, 400),
      bty = "l",
      xaxt = "n",
      flty = 2)
-lines(SPYPredict$fitted, lwd = 2, col = "blue")
-lines(SPYValidTS, lwd = 2, col = "red", lty = 3)
+lines(SPYPredict$fitted, 
+      lwd = 2, 
+      col = "blue")
+lines(SPYValidTS, 
+      lwd = 2, 
+      col = "red", 
+      lty = 3)
 ```
 
